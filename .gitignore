@@ -553,6 +553,9 @@ FodyWeavers.xsd
 # Azure cache
 __blobstorage__/
 
+# Ruff
+*ruff*/
+
 # Personal
 *[Mm]igrations*
 docs/examples.py

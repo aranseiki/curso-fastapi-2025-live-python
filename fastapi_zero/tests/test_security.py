@@ -2,19 +2,14 @@ from http import HTTPStatus
 
 from jwt import decode
 
-from fastapi_zero.security import (
-    ALGORITHM,
-    SECRET_KEY,
-    create_access_token,
-    get_current_user,
-)
+from fastapi_zero.security import create_access_token, get_current_user
 
 
-def test_jwt():
+def test_jwt(settings):
     data = {'test': 'test'}
 
     token = create_access_token(data)
-    decoded = decode(token, SECRET_KEY, algorithms=ALGORITHM)
+    decoded = decode(token, settings.SECRET_KEY, algorithms=settings.ALGORITHM)
 
     assert decoded['test'] == data['test']
     assert 'exp' in decoded
@@ -29,11 +24,11 @@ def test_jwt_invalid_token(client):
     assert response.json() == {'detail': 'Could not validate credentials'}
 
 
-def test_jwt_invalid_token_without_subject():
+def test_jwt_invalid_token_without_subject(settings):
     data = {'test': 'test'}
 
     token = create_access_token(data)
-    decoded = decode(token, SECRET_KEY, algorithms=ALGORITHM)
+    decoded = decode(token, settings.SECRET_KEY, algorithms=settings.ALGORITHM)
 
     result_current_user = ''
     try:

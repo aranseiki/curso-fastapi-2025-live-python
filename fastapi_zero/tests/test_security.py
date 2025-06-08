@@ -1,5 +1,6 @@
 from http import HTTPStatus
 
+import pytest
 from jwt import decode
 
 from fastapi_zero.security import create_access_token, get_current_user
@@ -24,7 +25,8 @@ def test_jwt_invalid_token(client):
     assert response.json() == {'detail': 'Could not validate credentials'}
 
 
-def test_jwt_invalid_token_without_subject(settings):
+@pytest.mark.asyncio
+async def test_jwt_invalid_token_without_subject(settings):
     data = {'test': 'test'}
 
     token = create_access_token(data)
@@ -32,7 +34,7 @@ def test_jwt_invalid_token_without_subject(settings):
 
     result_current_user = ''
     try:
-        result_current_user = get_current_user(token=token)
+        result_current_user = await get_current_user(token=token)
     except Exception as erro:
         result_current_user = erro
 

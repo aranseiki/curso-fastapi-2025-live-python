@@ -1,15 +1,24 @@
 from http import HTTPStatus
 
+import pytest
 
-def test_root_deve_retornar_ola_mundo(client):
+from fastapi_zero.app import read_hello, read_root
+
+
+@pytest.mark.asyncio
+async def test_root_deve_retornar_ola_mundo(client):
     response = client.get('/')
+    response_ola_mundo = await read_root()
 
     assert response.json() == {'message': 'Olá, mundo!'}
     assert response.status_code == HTTPStatus.OK
+    assert response.json() == response_ola_mundo
 
 
-def test_hello_deve_retornar_html(client):
+@pytest.mark.asyncio
+async def test_hello_deve_retornar_html(client):
     response = client.get('/hello')
+    response_hello = await read_hello()
 
     assert (
         response.text
@@ -32,3 +41,4 @@ def test_hello_deve_retornar_html(client):
     """
     )
     assert response.status_code == HTTPStatus.OK
+    assert response.text == response_hello

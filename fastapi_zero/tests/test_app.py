@@ -54,36 +54,33 @@ def test_create_user(client):
     }
 
 
-def test_read_users(client):
-    response = client.get('/users/')
-
-    assert response.status_code == HTTPStatus.OK
-    assert response.json() == {'users': []}
-
-
-def test_read_users_with_users(client, user):
+def test_read_users_with_users(client, user, token):
     user_schema = UserPublic.model_validate(user).model_dump()
 
-    response = client.get('/users/')
+    response = client.get(
+        '/users/',
+        headers={'Authorization': f'Bearer {token}'},
+    )
 
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {'users': [user_schema]}
 
 
-def test_update_user(client, user):
+def test_update_user(client, user, token):
     response = client.put(
         '/users/1',
+        headers={'Authorization': f'Bearer {token}'},
         json={
-            'username': 'bob',
-            'email': 'bob@example.com',
+            'username': 'alice',
+            'email': 'alice@example.com',
             'password': 'secret',
         },
     )
 
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {
-        'username': 'bob',
-        'email': 'bob@example.com',
+        'username': 'alice',
+        'email': 'alice@example.com',
         'id': 1,
     }
 
@@ -96,63 +93,27 @@ def test_read_user_with_id(client, user):
     assert response.json() == user_schema
 
 
-def test_delete_user(client, user):
-    response = client.delete('/users/1')
+def test_delete_user(client, user, token):
+    response = client.delete(
+        f'/users/{user.id}',
+        headers={'Authorization': f'Bearer {token}'},
+    )
 
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {'message': 'User deleted'}
 
 
-def test_update_user_not_found(client):
-    response = client.put(
-        '/users/1',
-        json={
-            'username': 'alice',
-            'email': 'alice@example.com',
-            'password': 'secret',
-        },
+def test_get_token(client, user):
+    response = client.post(
+        '/token/',
+        data={'username': user.email, 'password': user.clean_password},
     )
 
-    assert response.status_code == HTTPStatus.NOT_FOUND
-    assert response.json() == {'detail': 'User not found!'}
+    token = response.json()
 
-
-def test_delete_user_not_found(client):
-    response = client.delete('/users/1')
-
-    assert response.status_code == HTTPStatus.NOT_FOUND
-    assert response.json() == {'detail': 'User not found!'}
-
-
-def test_read_user_not_found(client):
-    response = client.get('/users/1')
-
-    assert response.status_code == HTTPStatus.NOT_FOUND
-    assert response.json() == {'detail': 'User not found!'}
-
-
-def test_update_integrity_error(client, user):
-    # Inserindo Fausto
-    client.post(
-        '/users/',
-        json={
-            'username': 'fausto',
-            'email': 'fausto@example.com',
-            'password': 'secret',
-        },
-    )
-
-    # Alterando o user das fixture para fausto
-    response = client.put(
-        f'/users/{user.id}',
-        json={
-            'username': 'fausto',
-            'email': 'bob@example.com',
-            'password': 'mynewpassword',
-        },
-    )
-    response.status_code == HTTPStatus.CONFLICT
-    response.json() == {'detail': 'Username or Email alrealdy exists'}
+    assert response.status_code == HTTPStatus.OK
+    assert token['token_type'] == 'Bearer'
+    assert 'access_token' in token
 
 
 def test_create_user_username_exists_error(client, user):
@@ -181,3 +142,125 @@ def test_create_user_email_exists_error(client, user):
 
     assert response.status_code == HTTPStatus.CONFLICT
     assert response.json() == {'detail': 'Email already exists.'}
+
+
+def test_update_user_forbidden(client, user, token):
+    response = client.put(
+        '/users/2',
+        headers={'Authorization': f'Bearer {token}'},
+        json={
+            'username': 'alice',
+            'email': 'bob@example.com',
+            'password': 'secret',
+        },
+    )
+
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json() == {'detail': 'Not enough permissions'}
+
+
+def test_delete_user_forbidden(client, user, token):
+    response = client.delete(
+        '/users/2',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json() == {'detail': 'Not enough permissions'}
+
+
+def test_update_user_unauthorized(client, user, token):
+    response = client.put(
+        '/users/1',
+        headers={'Authorization': f'Bearer {token}'},
+        json={
+            'username': 'alice',
+            'email': 'bob@example.com',
+            'password': 'secret',
+        },
+    )
+
+    response = client.put(
+        '/users/1',
+        headers={'Authorization': f'Bearer {token}'},
+        json={
+            'username': 'alice',
+            'email': 'alice@example.com',
+            'password': 'secret',
+        },
+    )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json() == {'detail': 'Could not validate credentials'}
+
+
+def test_delete_user_unauthorized(client, user, token):
+    response = client.put(
+        '/users/1',
+        headers={'Authorization': f'Bearer {token}'},
+        json={
+            'username': 'alice',
+            'email': 'bob@example.com',
+            'password': 'secret',
+        },
+    )
+    response = client.delete(
+        '/users/1',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json() == {'detail': 'Could not validate credentials'}
+
+
+def test_login_for_access_token_unauthorized_by_email(client, user, token):
+    response = client.post(
+        '/token/',
+        data={'username': 'bob@example.com', 'password': user.clean_password},
+    )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json() == {'detail': 'Incorrect email or password'}
+
+
+def test_login_for_access_token_unauthorized_by_password(client, user, token):
+    response = client.post(
+        '/token/',
+        data={'username': user.email, 'password': 'secret'},
+    )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json() == {'detail': 'Incorrect email or password'}
+
+
+def test_read_user_not_found(client):
+    response = client.get('/users/1')
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json() == {'detail': 'User not found!'}
+
+
+def test_update_integrity_error(client, user, token):
+    # Inserindo Fausto
+    client.post(
+        '/users/',
+        headers={'Authorization': f'Bearer {token}'},
+        json={
+            'username': 'fausto',
+            'email': 'fausto@example.com',
+            'password': 'secret',
+        },
+    )
+
+    # Alterando o user das fixture para fausto
+    response = client.put(
+        f'/users/{user.id}',
+        headers={'Authorization': f'Bearer {token}'},
+        json={
+            'username': 'fausto',
+            'email': 'bob@example.com',
+            'password': 'mynewpassword',
+        },
+    )
+    response.status_code == HTTPStatus.CONFLICT
+    response.json() == {'detail': 'Username or Email alrealdy exists'}

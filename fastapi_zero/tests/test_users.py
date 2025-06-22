@@ -71,10 +71,11 @@ def test_delete_user(client, user, token):
 
 
 def test_create_user_username_exists_error(client, user):
+    get_user = client.get('/users/1')
     response = client.post(
         '/users/',
         json={
-            'username': 'Teste',
+            'username': f'{get_user.json()['username']}',
             'email': 'alice@example.com',
             'password': 'secret',
         },
@@ -85,11 +86,12 @@ def test_create_user_username_exists_error(client, user):
 
 
 def test_create_user_email_exists_error(client, user):
+    get_user = client.get('/users/1')
     response = client.post(
         '/users/',
         json={
             'username': 'alice',
-            'email': 'Teste@test.com',
+            'email': f'{get_user.json()['email']}',
             'password': 'secret',
         },
     )
@@ -198,3 +200,18 @@ def test_update_integrity_error(client, user, token):
     )
     response.status_code == HTTPStatus.CONFLICT
     response.json() == {'detail': 'Username or Email alrealdy exists'}
+
+
+def test_update_user_with_wrong_user(client, other_user, token):
+    response = client.put(
+        f'/users/{other_user.id}',
+        headers={'Authorization': f'Bearer {token}'},
+        json={
+            'username': 'bob',
+            'email': 'bob@example.com',
+            'password': 'mynewpassword'
+        },
+    )
+
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json() == {'detail': 'Not enough permissions'}
